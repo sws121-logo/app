@@ -510,31 +510,23 @@ def main():
                 
                 st.write(f"**Estimated Interest Rate**: {interest_rate}%")
                 st.write(f"**Approval Chance**: {approval_chance}")
+                st.info("Your loan application will be reviewed by an administrator. You will be notified once a decision is made.")
                 
                 submitted = st.form_submit_button("Submit Application")
                 
                 if submitted:
-                    # Determine approval based on credit score and other factors
-                    # Fix: Handle case where profile[3] (income) might be None
-                    income = profile[3] if profile[3] is not None else 0  # Fixed index: income is at index 3
-                    if credit_score >= 650 and loan_amount <= income * 0.5:
-                        status = "approved"
-                        message = "Congratulations! Your loan application has been approved."
-                    else:
-                        status = "pending"
-                        message = "Your loan application is under review."
+                    # All loans start as pending - admin must approve them
+                    status = "pending"
+                    message = "Your loan application has been submitted and is pending review by an administrator."
                     
                     # Save loan application
                     conn = sqlite3.connect('loan_app.db')
                     c = conn.cursor()
                     application_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     
-                    if status == "approved":
-                        approved_date = application_date
-                        due_date = (datetime.now() + timedelta(days=loan_term*30)).strftime("%Y-%m-%d %H:%M:%S")
-                    else:
-                        approved_date = None
-                        due_date = None
+                    # For pending loans, approved_date and due_date are None until approved
+                    approved_date = None
+                    due_date = None
                     
                     c.execute(
                         "INSERT INTO loans (user_id, amount, interest_rate, term_months, status, application_date, approved_date, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -564,7 +556,9 @@ def main():
                             st.write(f"**Term**: {loan[4]} months")
                         
                         with col2:
-                            st.write(f"**Status**: {loan[5]}")
+                            status = loan[5]
+                            status_color = "green" if status == "approved" else "orange" if status == "pending" else "red"
+                            st.write(f"**Status**: :{status_color}[{status}]")
                             st.write(f"**Application Date**: {loan[6]}")
                             
                             if loan[7]:  # Approved date
@@ -585,7 +579,7 @@ def main():
                                     except ValueError:
                                         st.write("Invalid due date format")
                         
-                        # Payment section for approved loans
+                        # Payment section for approved loans only
                         if loan[5] == "approved":
                             st.subheader("Make a Payment")
                             payment_amount = st.number_input(
@@ -614,6 +608,10 @@ def main():
                                 conn.close()
                                 st.success(f"Payment of Rs.{payment_amount:,.2f} processed")
                                 st.rerun()
+                        elif loan[5] == "pending":
+                            st.info("⏳ This loan application is pending review by an administrator.")
+                        elif loan[5] == "rejected":
+                            st.error("❌ This loan application was rejected.")
         
         # Admin Panel
         elif choice == "Admin Panel" and st.session_state.username == "admin":
@@ -665,13 +663,58 @@ def main():
             with tab2:
                 st.subheader("Loan Management")
                 conn = sqlite3.connect('loan_app.db')
+                
+                # Show pending loans first
+                st.subheader("Pending Loans Requiring Review")
+                pending_loans = pd.read_sql_query(
+                    "SELECT l.*, u.username FROM loans l JOIN users u ON l.user_id = u.id WHERE l.status = 'pending'", 
+                    conn
+                )
+                
+                if not pending_loans.empty:
+                    st.dataframe(pending_loans)
+                    
+                    # Quick approval/rejection for each pending loan
+                    for _, loan in pending_loans.iterrows():
+                        st.write(f"**Loan #{loan['id']} - {loan['username']} - Rs.{loan['amount']:,.2f}**")
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            if st.button(f"Approve Loan #{loan['id']}", key=f"approve_{loan['id']}"):
+                                c = conn.cursor()
+                                approved_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                due_date = (datetime.now() + timedelta(days=loan['term_months']*30)).strftime("%Y-%m-%d %H:%M:%S")
+                                
+                                c.execute(
+                                    "UPDATE loans SET status = 'approved', approved_date = ?, due_date = ? WHERE id = ?",
+                                    (approved_date, due_date, loan['id'])
+                                )
+                                conn.commit()
+                                st.success(f"Loan #{loan['id']} approved successfully!")
+                                st.rerun()
+                        
+                        with col2:
+                            if st.button(f"Reject Loan #{loan['id']}", key=f"reject_{loan['id']}"):
+                                c = conn.cursor()
+                                c.execute(
+                                    "UPDATE loans SET status = 'rejected' WHERE id = ?",
+                                    (loan['id'],)
+                                )
+                                conn.commit()
+                                st.success(f"Loan #{loan['id']} rejected!")
+                                st.rerun()
+                else:
+                    st.info("No pending loans requiring review")
+                
+                # Show all loans
+                st.subheader("All Loans")
                 loans = pd.read_sql_query(
                     "SELECT l.*, u.username FROM loans l JOIN users u ON l.user_id = u.id", 
                     conn
                 )
                 st.dataframe(loans)
                 
-                # Update loan status
+                # Update loan status manually
                 st.subheader("Update Loan Status")
                 loan_id = st.number_input("Loan ID", min_value=1)
                 new_status = st.selectbox("New Status", ["pending", "approved", "rejected"])
@@ -681,16 +724,19 @@ def main():
                     if new_status == "approved":
                         # Set approved date and due date
                         approved_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        loan_term = c.execute(
-                            "SELECT term_months FROM loans WHERE id = ?", 
-                            (loan_id,)
-                        ).fetchone()[0]
-                        due_date = (datetime.now() + timedelta(days=loan_term*30)).strftime("%Y-%m-%d %H:%M:%S")
-                        
-                        c.execute(
-                            "UPDATE loans SET status = ?, approved_date = ?, due_date = ? WHERE id = ?",
-                            (new_status, approved_date, due_date, loan_id)
-                        )
+                        # Get loan term
+                        c.execute("SELECT term_months FROM loans WHERE id = ?", (loan_id,))
+                        result = c.fetchone()
+                        if result:
+                            loan_term = result[0]
+                            due_date = (datetime.now() + timedelta(days=loan_term*30)).strftime("%Y-%m-%d %H:%M:%S")
+                            
+                            c.execute(
+                                "UPDATE loans SET status = ?, approved_date = ?, due_date = ? WHERE id = ?",
+                                (new_status, approved_date, due_date, loan_id)
+                            )
+                        else:
+                            st.error("Loan not found")
                     else:
                         c.execute(
                             "UPDATE loans SET status = ? WHERE id = ?",
@@ -699,6 +745,7 @@ def main():
                     
                     conn.commit()
                     st.success(f"Loan #{loan_id} status updated to {new_status}")
+                    st.rerun()
                 
                 conn.close()
             
@@ -737,6 +784,8 @@ def main():
                 st.metric("Average Credit Score", f"{avg_credit:.1f}/850")
                 
                 conn.close()
+        elif choice == "Admin Panel" and st.session_state.username != "admin":
+            st.error("⛔ Access denied. Only administrators can access this panel.")
 
 if __name__ == "__main__":
     main()
