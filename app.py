@@ -264,10 +264,9 @@ def main():
             
             with col1:
                 st.subheader("Credit Score")
-                if profile and profile[4] is not None:
-                    # Fix: Safely convert credit score to int
+                if profile and profile[5] is not None:  # Fixed index: credit_score is at index 5
                     try:
-                        credit_score = int(profile[4])
+                        credit_score = int(profile[5])
                         st.metric("Score", f"{credit_score}/850")
                     except (ValueError, TypeError):
                         st.write("Credit score not available")
@@ -276,10 +275,9 @@ def main():
             
             with col2:
                 st.subheader("Civil Score")
-                if profile and profile[5] is not None:
-                    # Fix: Safely convert civil score to int
+                if profile and profile[6] is not None:  # Fixed index: civil_score is at index 6
                     try:
-                        civil_score = int(profile[5])
+                        civil_score = int(profile[6])
                         st.metric("Score", f"{civil_score}/100")
                     except (ValueError, TypeError):
                         st.write("Civil score not available")
@@ -311,7 +309,7 @@ def main():
             if loans:
                 for loan in loans[-5:]:
                     status_color = "green" if loan[5] == "approved" else "orange" if loan[5] == "pending" else "red"
-                    st.write(f"**{loan[6].split()[0]}**: Applied for ${loan[2]:,.2f} - :{status_color}[{loan[5]}]")
+                    st.write(f"**{loan[6].split()[0]}**: Applied for Rs.{loan[2]:,.2f} - :{status_color}[{loan[5]}]")
             else:
                 st.info("No loan applications yet")
         
@@ -321,10 +319,9 @@ def main():
             
             profile = get_user_profile(st.session_state.user_id)
             
-            if profile and profile[4] is not None:
-                # Fix: Safely convert credit score to int
+            if profile and profile[5] is not None:  # Fixed index: credit_score is at index 5
                 try:
-                    credit_score = int(profile[4])
+                    credit_score = int(profile[5])
                     st.metric("Your Credit Score", f"{credit_score}/850")
                 except (ValueError, TypeError):
                     st.error("Credit score data is invalid")
@@ -336,10 +333,10 @@ def main():
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    st.write(f"**Income**: ${profile[2]:,.2f}")
-                    st.progress(min(profile[2] / 100000, 1.0))
+                    st.write(f"**Income**: Rs.{profile[3]:,.2f}")  # Fixed index: income is at index 3
+                    st.progress(min(profile[3] / 100000, 1.0))  # Fixed index: income is at index 3
                     
-                    employment_status = profile[3]
+                    employment_status = profile[4]  # Fixed index: employment_status is at index 4
                     st.write(f"**Employment**: {employment_status}")
                     employment_values = {
                         "employed": 1.0,
@@ -360,7 +357,7 @@ def main():
                     st.progress(payment_history)
                     
                     # Age factor
-                    age = profile[1]
+                    age = profile[2]  # Fixed index: age is at index 2
                     st.write(f"**Age**: {age} years")
                     age_factor = min(age / 40, 1.0) if age > 25 else 0.5
                     st.progress(age_factor)
@@ -379,7 +376,7 @@ def main():
                 with st.form("profile_form"):
                     st.subheader("Complete Your Profile")
                     age = st.number_input("Age", min_value=18, max_value=100, value=25)
-                    income = st.number_input("Annual Income ($)", min_value=0, value=50000)
+                    income = st.number_input("Annual Income (Rs.)", min_value=0, value=50000)
                     employment_status = st.selectbox(
                         "Employment Status",
                         ["Employed", "Self-Employed", "Unemployed", "Student", "Retired"]
@@ -408,10 +405,9 @@ def main():
             
             profile = get_user_profile(st.session_state.user_id)
             
-            if profile and profile[5] is not None:
-                # Fix: Handle None values for civil score
+            if profile and profile[6] is not None:  # Fixed index: civil_score is at index 6
                 try:
-                    civil_score = int(profile[5]) if profile[5] is not None else 0
+                    civil_score = int(profile[6]) if profile[6] is not None else 0
                     st.metric("Your Civil Score", f"{civil_score}/100")
                 except (ValueError, TypeError):
                     st.error("Civil score data is invalid")
@@ -423,11 +419,11 @@ def main():
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    st.write(f"**Age**: {profile[1]} years")
-                    age_factor = min(profile[1] / 40, 1.0) if profile[1] > 25 else 0.5
+                    st.write(f"**Age**: {profile[2]} years")  # Fixed index: age is at index 2
+                    age_factor = min(profile[2] / 40, 1.0) if profile[2] > 25 else 0.5  # Fixed index: age is at index 2
                     st.progress(age_factor)
                     
-                    st.write(f"**Employment**: {profile[3]}")
+                    st.write(f"**Employment**: {profile[4]}")  # Fixed index: employment_status is at index 4
                     employment_values = {
                         "employed": 1.0,
                         "self-employed": 0.8,
@@ -435,16 +431,16 @@ def main():
                         "student": 0.5,
                         "unemployed": 0.3
                     }
-                    # Fix: Check if profile[3] exists and is a string before calling .lower()
-                    if profile[3] and isinstance(profile[3], str):
-                        st.progress(employment_values.get(profile[3].lower(), 0.5))
+                    # Fix: Check if profile[4] exists and is a string before calling .lower()
+                    if profile[4] and isinstance(profile[4], str):
+                        st.progress(employment_values.get(profile[4].lower(), 0.5))
                     else:
                         st.progress(0.5)
                 
                 with col2:
                     # Fix: Handle None values for credit score
                     try:
-                        credit_score_value = int(profile[4]) if profile[4] is not None else 300
+                        credit_score_value = int(profile[5]) if profile[5] is not None else 300  # Fixed index: credit_score is at index 5
                         st.write(f"**Credit Score**: {credit_score_value}/850")
                         credit_factor = credit_score_value / 850
                         st.progress(credit_factor)
@@ -482,7 +478,7 @@ def main():
             with st.form("loan_application"):
                 st.subheader("Loan Application Form")
                 
-                loan_amount = st.number_input("Loan Amount ($)", min_value=100, max_value=1000000, value=10000)
+                loan_amount = st.number_input("Loan Amount (Rs.)", min_value=100, max_value=1000000, value=10000)
                 loan_term = st.slider("Loan Term (months)", 6, 60, 12)
                 purpose = st.selectbox(
                     "Loan Purpose",
@@ -492,7 +488,7 @@ def main():
                 # Display estimated terms based on credit score
                 # Fix: Handle None values for credit score
                 try:
-                    credit_score = int(profile[4]) if profile and profile[4] is not None else 300
+                    credit_score = int(profile[5]) if profile and profile[5] is not None else 300  # Fixed index: credit_score is at index 5
                 except (ValueError, TypeError):
                     credit_score = 300  # Default to minimum score if conversion fails
                 
@@ -519,8 +515,8 @@ def main():
                 
                 if submitted:
                     # Determine approval based on credit score and other factors
-                    # Fix: Handle case where profile[2] (income) might be None
-                    income = profile[2] if profile[2] is not None else 0
+                    # Fix: Handle case where profile[3] (income) might be None
+                    income = profile[3] if profile[3] is not None else 0  # Fixed index: income is at index 3
                     if credit_score >= 650 and loan_amount <= income * 0.5:
                         status = "approved"
                         message = "Congratulations! Your loan application has been approved."
@@ -559,11 +555,11 @@ def main():
                 st.info("You don't have any loan applications yet")
             else:
                 for loan in loans:
-                    with st.expander(f"Loan #{loan[0]} - ${loan[2]:,.2f} - {loan[5]}"):
+                    with st.expander(f"Loan #{loan[0]} - Rs.{loan[2]:,.2f} - {loan[5]}"):
                         col1, col2 = st.columns(2)
                         
                         with col1:
-                            st.write(f"**Amount**: ${loan[2]:,.2f}")
+                            st.write(f"**Amount**: Rs.{loan[2]:,.2f}")
                             st.write(f"**Interest Rate**: {loan[3]}%")
                             st.write(f"**Term**: {loan[4]} months")
                         
@@ -585,7 +581,7 @@ def main():
                                             days_overdue = (datetime.now() - due_date).days
                                             penalty = loan[2] * loan[9] * (days_overdue / 365)
                                             st.error(f"**Overdue by {days_overdue} days**")
-                                            st.error(f"**Penalty**: ${penalty:,.2f}")
+                                            st.error(f"**Penalty**: Rs.{penalty:,.2f}")
                                     except ValueError:
                                         st.write("Invalid due date format")
                         
@@ -616,7 +612,7 @@ def main():
                                 )
                                 conn.commit()
                                 conn.close()
-                                st.success(f"Payment of ${payment_amount:,.2f} processed")
+                                st.success(f"Payment of Rs.{payment_amount:,.2f} processed")
                                 st.rerun()
         
         # Admin Panel
@@ -723,7 +719,7 @@ def main():
                 col3.metric("Pending", total_pending)
                 col4.metric("Rejected", total_rejected)
                 
-                st.metric("Total Amount Lent", f"${total_amount:,.2f}")
+                st.metric("Total Amount Lent", f"Rs.{total_amount:,.2f}")
                 
                 # Loan status distribution
                 status_data = pd.read_sql_query(
